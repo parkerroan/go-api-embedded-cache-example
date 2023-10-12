@@ -63,5 +63,24 @@ func (s *StorageClient) RetreiveFromCache(id string) (*Item, error) {
 	var result Item
 	err = json.Unmarshal(value, &result)
 
+	if err := txn.Commit(); err != nil {
+		return nil, err
+	}
+
 	return &result, nil
+}
+
+func (s *StorageClient) RemoveFromCache(id string) error {
+	txn := s.Cache.NewTransaction(true)
+	defer txn.Discard()
+
+	if err := txn.Delete([]byte(id)); err != nil {
+		return err
+	}
+
+	if err := txn.Commit(); err != nil {
+		return err
+	}
+
+	return nil
 }
