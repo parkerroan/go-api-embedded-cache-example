@@ -21,9 +21,10 @@ type StorageClient struct {
 	streamProcessor *StreamProcessor
 }
 
-func NewStorageClient(cache Cache) *StorageClient {
+func NewStorageClient(sql *SqlClient, cache Cache) *StorageClient {
 
 	storage := &StorageClient{
+		sql:   sql,
 		cache: cache,
 	}
 
@@ -57,10 +58,17 @@ func (s *StorageClient) GetItem(ctx context.Context, id string) (*Item, error) {
 	return result, nil
 }
 
-func (s *StorageClient) UpsertItem(id string) (*Item, error) {
-	return &Item{}, nil
+func (s *StorageClient) UpsertItem(ctx context.Context, item Item) (*Item, error) {
+	result, err := s.sql.UpsertItem(ctx, item)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
 
 func (s *StorageClient) ProcessCacheInvalidationMessage(ctx context.Context, msgID string, values map[string]interface{}) error {
+	//log message
+	slog.Info("Processing cache invalidation message:", slog.String("msg_id", msgID))
 	return s.cache.Remove(msgID)
 }

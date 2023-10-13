@@ -2,12 +2,15 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"log/slog"
 	"net/http"
 
 	"github.com/dgraph-io/badger/v4"
 	"github.com/go-redis/redis/v8"
+	"github.com/jmoiron/sqlx"
+	_ "github.com/lib/pq"
 	"github.com/parkerroan/go-api-badger-cache-tutorial/internal/storage"
 	"github.com/parkerroan/go-api-badger-cache-tutorial/internal/webserver"
 )
@@ -25,11 +28,20 @@ func main() {
 
 	cacheClient := storage.NewCacheClient(db)
 
-	storageClient := storage.NewStorageClient(cacheClient)
+	//New sqlx DB
+	sqlxDB := sqlx.MustConnect("postgres", "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable")
+
+	sqlClient := storage.NewSqlClient(sqlxDB)
+
+	storageClient := storage.NewStorageClient(sqlClient, cacheClient)
 
 	redis := redis.NewClient(&redis.Options{
 		Addr: "localhost:6379",
 	})
+
+	if status := redis.Ping(ctx); status.Err() != nil {
+		log.Fatalf("Redis Ping(): %v", status.Err())
+	}
 
 	streamName := "tutorial.inventory.items"
 	streamProcessor := storage.NewStreamProcessor(streamName, redis)
@@ -47,7 +59,7 @@ func main() {
 	// Start HTTP server in a goroutine
 	go func() {
 		if err := webserver.Run(ctx); err != http.ErrServerClosed {
-			log.Fatalf("ListenAndServe(): %v", err)
+			slog.Error(fmt.Sprintf("ListenAndServe(): %v", err))
 			cancel()
 		}
 	}()
