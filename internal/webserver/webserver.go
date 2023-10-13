@@ -1,6 +1,7 @@
 package webserver
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -35,17 +36,19 @@ func (s *WebServer) Register() {
 }
 
 // Run starts the webserver
-func (s *WebServer) Run() {
+func (s *WebServer) Run(ctx context.Context) error {
 	slog.Debug("Server started on port:", port)
 	if err := http.ListenAndServe(":"+port, s.Router); err != nil {
-		slog.Error(err.Error())
+		return err
 	}
+	return nil
 }
 
 func (s *WebServer) getItemsHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	vars := mux.Vars(r)
 	id := vars["id"]
-	item, err := s.StorageClient.GetItem(id)
+	item, err := s.StorageClient.GetItem(ctx, id)
 	if err != nil {
 		slog.Error(err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
@@ -65,7 +68,8 @@ func (s *WebServer) getItemsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *WebServer) upsertItemsHandler(w http.ResponseWriter, r *http.Request) {
-	item, err := s.StorageClient.GetItem("1")
+	ctx := r.Context()
+	item, err := s.StorageClient.GetItem(ctx, "1")
 	if err != nil {
 		slog.Error(err.Error())
 		w.WriteHeader(http.StatusInternalServerError)

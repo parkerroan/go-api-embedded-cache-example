@@ -1,31 +1,37 @@
 package storage
 
 import (
-	"encoding/json"
+	"context"
+	"log/slog"
 	"time"
-
-	badger "github.com/dgraph-io/badger/v4"
 )
 
 type Item struct {
-	ID          string
-	Name        string
-	Description string
-	CreatedAt   time.Time
+	ID          string    `json:"id" db:"id"`
+	Name        string    `json:"name" db:"name"`
+	Description string    `json:"description" db:"description"`
+	Price       float64   `json:"price" db:"price"`
+	CreatedAt   time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
 }
 
 type StorageClient struct {
-	Cache *badger.DB
+	sql             *SqlClient
+	cache           Cache
+	streamProcessor *StreamProcessor
 }
 
-func NewStorageClient(cache *badger.DB) *StorageClient {
-	return &StorageClient{
-		Cache: cache,
+func NewStorageClient(cache Cache) *StorageClient {
+
+	storage := &StorageClient{
+		cache: cache,
 	}
+
+	return storage
 }
 
-func (s *StorageClient) GetItem(id string) (*Item, error) {
-	cachedResult, err := s.RetreiveFromCache(id)
+func (s *StorageClient) GetItem(ctx context.Context, id string) (*Item, error) {
+	cachedResult, err := s.cache.Retreive(id)
 	if err != nil {
 		return nil, err
 	}
@@ -34,53 +40,27 @@ func (s *StorageClient) GetItem(id string) (*Item, error) {
 		return cachedResult, nil
 	}
 
-	//TODO Call DB to get item
+	result, err := s.sql.GetItem(ctx, id)
+	if err != nil {
+		return nil, err
+	}
 
-	return &Item{}, nil
+	if result == nil {
+		return nil, nil
+	}
+
+	if err := s.cache.Set(id, result); err != nil {
+		//log error and continue
+		slog.Error(err.Error())
+	}
+
+	return result, nil
 }
 
 func (s *StorageClient) UpsertItem(id string) (*Item, error) {
 	return &Item{}, nil
 }
 
-func (s *StorageClient) RetreiveFromCache(id string) (*Item, error) {
-	txn := s.Cache.NewTransaction(true)
-	defer txn.Discard()
-
-	item, err := txn.Get([]byte(id))
-	if err != nil {
-		return nil, err
-	}
-
-	// take item bytes and unmarshal into Item struct
-	var value []byte
-	value, err = item.ValueCopy(value)
-	if err != nil {
-		return nil, err
-	}
-
-	//marshal item bytes into Item struct
-	var result Item
-	err = json.Unmarshal(value, &result)
-
-	if err := txn.Commit(); err != nil {
-		return nil, err
-	}
-
-	return &result, nil
-}
-
-func (s *StorageClient) RemoveFromCache(id string) error {
-	txn := s.Cache.NewTransaction(true)
-	defer txn.Discard()
-
-	if err := txn.Delete([]byte(id)); err != nil {
-		return err
-	}
-
-	if err := txn.Commit(); err != nil {
-		return err
-	}
-
-	return nil
+func (s *StorageClient) ProcessCacheInvalidationMessage(ctx context.Context, msgID string, values map[string]interface{}) error {
+	return s.cache.Remove(msgID)
 }
