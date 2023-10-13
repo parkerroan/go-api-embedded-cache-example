@@ -2,7 +2,9 @@ package storage
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
+	"strconv"
 	"time"
 )
 
@@ -70,5 +72,35 @@ func (s *StorageClient) UpsertItem(ctx context.Context, item Item) (*Item, error
 func (s *StorageClient) ProcessCacheInvalidationMessage(ctx context.Context, msgID string, values map[string]interface{}) error {
 	//log message
 	slog.Info("Processing cache invalidation message:", slog.String("msg_id", msgID))
-	return s.cache.Remove(msgID)
+
+	type msg struct {
+		Payload struct {
+			Op    string `json:"op"`
+			After struct {
+				ID int `json:"id"`
+			} `json:"after"`
+		} `json:"payload"`
+	}
+
+	//extract payload
+	for _, v := range values {
+		//marshal to Payload struct
+		v := v.(string)
+		var message msg
+		if err := json.Unmarshal([]byte(v), &message); err != nil {
+			return err
+		}
+		if message.Payload.Op != "" {
+			//remove item from cache
+			slog.Info("Removing item from cache:", slog.Int("id", message.Payload.After.ID))
+
+			//convert ID to string
+			id := strconv.Itoa(message.Payload.After.ID)
+			if err := s.cache.Remove(id); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
