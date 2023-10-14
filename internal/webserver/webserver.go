@@ -3,6 +3,7 @@ package webserver
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -47,20 +48,20 @@ func (s *WebServer) Run(ctx context.Context) error {
 func (s *WebServer) getItemsHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
+
 	id := vars["id"]
+
 	item, err := s.StorageClient.GetItem(ctx, id)
 	if err != nil {
+		if errors.Is(err, storage.ErrItemNotFound) {
+			slog.Debug("Item not found:", id)
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
 		slog.Error(err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-
-	if item == nil {
-		slog.Debug("Item not found:", id)
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-	slog.Debug("Item:", item)
 
 	//return item as json
 	w.Header().Set("Content-Type", "application/json")
@@ -82,6 +83,11 @@ func (s *WebServer) upsertItemsHandler(w http.ResponseWriter, r *http.Request) {
 	if item.ID != "" {
 		_, err := s.StorageClient.GetItem(ctx, item.ID)
 		if err != nil {
+			if errors.Is(err, storage.ErrItemNotFound) {
+				slog.Debug("Item not found for update:", item.ID)
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
 			slog.Error(err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
 			return

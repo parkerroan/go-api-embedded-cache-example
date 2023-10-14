@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/dgraph-io/badger/v4"
+	"github.com/dgraph-io/ristretto"
 	"github.com/go-redis/redis/v8"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
@@ -20,13 +20,16 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel() // Make sure all paths cancel the context to release resources
 
-	db, err := badger.Open(badger.DefaultOptions("/tmp/badger"))
+	cache, err := ristretto.NewCache(&ristretto.Config{
+		NumCounters: 1e7, // number of keys to track frequency of (10M).
+		MaxCost:     1e6, // maximum number of items (1M)
+		BufferItems: 64,  // number of keys per Get buffer.
+	})
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
-	defer db.Close()
 
-	cacheClient := storage.NewCacheClient(db)
+	cacheClient := storage.NewCacheClient(cache)
 
 	//New sqlx DB
 	sqlxDB := sqlx.MustConnect("postgres", "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable")
@@ -50,6 +53,9 @@ func main() {
 	go func() {
 		if err := streamProcessor.Run(ctx, storageClient.ProcessCacheInvalidationMessage); err != nil {
 			slog.Error(err.Error())
+			// Cancel the context if there is an error and shut down the application.
+			// 		Depending on your application and fault tolerance, you may want to
+			// 		log and continue here instead of shutting down the application.
 			cancel()
 		}
 	}()

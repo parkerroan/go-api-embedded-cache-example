@@ -34,9 +34,18 @@ func (s *SqlClient) GetItem(ctx context.Context, id string) (*Item, error) {
 }
 
 func (s *SqlClient) UpsertItem(ctx context.Context, item Item) (*Item, error) {
+
+	insertCols := []string{"name", "description", "price"}
+	insertVals := []interface{}{item.Name, item.Description, item.Price}
+
+	if item.ID != "" {
+		insertCols = append(insertCols, "id")
+		insertVals = append(insertVals, item.ID)
+	}
+
 	//upsert squirrel query returning all fields
-	query := sq.Insert("inventory.items").Columns("name", "description", "price").
-		Values(item.Name, item.Description, item.Price).
+	query := sq.Insert("inventory.items").Columns(insertCols...).
+		Values(insertVals...).
 		Suffix("ON CONFLICT (id) DO UPDATE SET name = ?, description = ?, price = ?, updated_at = now()", item.Name, item.Description, item.Price).
 		Suffix("RETURNING *")
 

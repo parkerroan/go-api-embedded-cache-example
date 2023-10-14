@@ -1,69 +1,49 @@
 package storage
 
 import (
-	"encoding/json"
+	"time"
 
-	badger "github.com/dgraph-io/badger/v4"
+	"github.com/dgraph-io/ristretto"
 )
 
 type Cache interface {
-	Set(id string, item *Item) error
+	Set(id string, item Item) error
 	Retreive(id string) (*Item, error)
 	Remove(id string) error
 }
 
 type CacheClient struct {
-	db *badger.DB
+	cache *ristretto.Cache
 }
 
-func NewCacheClient(db *badger.DB) *CacheClient {
+func NewCacheClient(cache *ristretto.Cache) *CacheClient {
 	return &CacheClient{
-		db: db,
+		cache: cache,
 	}
 }
 
-func (c *CacheClient) Set(id string, item *Item) error {
+func (c *CacheClient) Set(id string, item Item) error {
+
+	// set item in cache
+	c.cache.SetWithTTL(id, item, 1, time.Duration(12*time.Hour))
+
 	return nil
 }
 
 func (c *CacheClient) Retreive(id string) (*Item, error) {
-	txn := c.db.NewTransaction(true)
-	defer txn.Discard()
 
-	item, err := txn.Get([]byte(id))
-	if err != nil {
-		return nil, err
+	// get item from cache
+	if item, found := c.cache.Get(id); found {
+		item := item.(Item)
+		return &item, nil
 	}
 
-	// take item bytes and unmarshal into Item struct
-	var value []byte
-	value, err = item.ValueCopy(value)
-	if err != nil {
-		return nil, err
-	}
-
-	//marshal item bytes into Item struct
-	var result Item
-	err = json.Unmarshal(value, &result)
-
-	if err := txn.Commit(); err != nil {
-		return nil, err
-	}
-
-	return &result, nil
+	return nil, nil
 }
 
 func (c *CacheClient) Remove(id string) error {
-	txn := c.db.NewTransaction(true)
-	defer txn.Discard()
-
-	if err := txn.Delete([]byte(id)); err != nil {
-		return err
-	}
-
-	if err := txn.Commit(); err != nil {
-		return err
-	}
+	// remove item from cache
+	c.cache.Del(id)
 
 	return nil
 }

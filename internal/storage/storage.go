@@ -2,10 +2,16 @@ package storage
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"strconv"
 	"time"
+)
+
+var (
+	ErrItemNotFound = errors.New("item not found")
 )
 
 type Item struct {
@@ -18,9 +24,8 @@ type Item struct {
 }
 
 type StorageClient struct {
-	sql             *SqlClient
-	cache           Cache
-	streamProcessor *StreamProcessor
+	sql   *SqlClient
+	cache Cache
 }
 
 func NewStorageClient(sql *SqlClient, cache Cache) *StorageClient {
@@ -40,19 +45,20 @@ func (s *StorageClient) GetItem(ctx context.Context, id string) (*Item, error) {
 	}
 
 	if cachedResult != nil {
+		slog.Info("Retrieved item from cache", slog.String("id", cachedResult.ID))
 		return cachedResult, nil
 	}
 
 	result, err := s.sql.GetItem(ctx, id)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrItemNotFound
+		}
 		return nil, err
 	}
 
-	if result == nil {
-		return nil, nil
-	}
-
-	if err := s.cache.Set(id, result); err != nil {
+	//set item in cache
+	if err := s.cache.Set(id, *result); err != nil {
 		//log error and continue
 		slog.Error(err.Error())
 	}

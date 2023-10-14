@@ -35,6 +35,7 @@ func (p *StreamProcessor) Run(ctx context.Context, processMessage ProccessMessag
 		data, err := p.rdb.XRead(ctx, &redis.XReadArgs{
 			Streams: []string{p.StreamName, id},
 			Count:   4,
+			Block:   0,
 		}).Result()
 		if err != nil {
 			slog.Error("Error run stream processor", slog.String("error", err.Error()))
@@ -45,9 +46,8 @@ func (p *StreamProcessor) Run(ctx context.Context, processMessage ProccessMessag
 			for _, message := range result.Messages {
 				msg := message
 				if err := processMessage(ctx, msg.ID, msg.Values); err != nil {
-					slog.Error(err.Error())
-					//retry
-					continue
+					slog.Error("Error process message", slog.String("error", err.Error()))
+					return err
 				}
 				// Update the last seen ID
 				id = msg.ID
