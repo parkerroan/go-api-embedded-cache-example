@@ -12,11 +12,13 @@ In this pattern, we'll use the following components:
 4. **[Ristretto](https://github.com/dgraph-io/ristretto)** as an in-memory caching solution in Go.
 5. **Go** as the primary language for implementing the service.
 
-# Sequence Diagrams: 
+# Diagrams: 
 
-![Read Sequence](https://cdn-images-1.medium.com/max/800/1*wmgCh0COc--30vBW6Xdi_g.png)
+![Arch](https://substackcdn.com/image/fetch/f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F199a014c-b55f-4211-923b-7c78f7a6735e_1502x1277.png)
 
-![Edit Sequence](https://cdn-images-1.medium.com/max/1200/1*drE4ENgJ9WbnFhs4ulQbBA.png)
+![Read Sequence]([https://cdn-images-1.medium.com/max/800/1*wmgCh0COc--30vBW6Xdi_g.png](https://substackcdn.com/image/fetch/f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F19adcfb7-59b4-4d1b-9cc0-477306ed834d_1200x647.png))
+
+![Edit Sequence]([https://cdn-images-1.medium.com/max/1200/1*drE4ENgJ9WbnFhs4ulQbBA.png](https://substackcdn.com/image/fetch/f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fe7e69da0-3cd4-4175-bdb3-d853cd18afe1_800x725.png))
 
 
 # Setup
